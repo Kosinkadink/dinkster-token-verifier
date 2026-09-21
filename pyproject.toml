@@ -4,9 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dinkster-token-verifier"
-version = "0.1.0"
+version = "0.1.1"
 description = "Offline verification of Dinkster access tokens and policy snapshots"
 readme = "README.md"
+license = "Apache-2.0"
 requires-python = ">=3.12"
 dependencies = [
     "httpx>=0.28,<1",
@@ -27,6 +28,9 @@ dev = [
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+dinkster_token_verifier = ["py.typed"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"
