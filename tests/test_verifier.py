@@ -115,6 +115,90 @@ async def test_rejects_invalid_signed_claims(changes: dict[str, object]) -> None
         assert await verifier.verify(token(key, "key-1", claims(**changes))) is None
 
 
+@pytest.mark.asyncio
+async def test_verifies_an_api_key_agent_with_allowed_scopes() -> None:
+    key = OKPKey.generate_key("Ed25519")
+    api_key_id = UUID(int=4)
+
+    def jwks(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"keys": [public_jwk(key, "key-1")]},
+            request=request,
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(jwks)) as client:
+        verifier = TokenVerifier(
+            jwks_url="https://identity.example/.well-known/jwks.json",
+            issuer="https://identity.example",
+            audience="dinkster-session",
+            client=client,
+        )
+        principal = await verifier.verify(
+            token(
+                key,
+                "key-1",
+                claims(
+                    sub=f"k_{api_key_id}",
+                    kind="agent",
+                    key=str(api_key_id),
+                    key_scopes=["api:execute", "api:assets"],
+                ),
+            )
+        )
+
+    assert principal is not None
+    assert principal.principal_id == f"k_{api_key_id}"
+    assert principal.kind == "agent"
+    assert principal.api_key_id == api_key_id
+    assert principal.api_key_scopes == frozenset({"api:execute", "api:assets"})
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("key_claim", "scopes"),
+    [
+        (str(UUID(int=5)), ["api:execute"]),
+        (str(UUID(int=4)), []),
+        (str(UUID(int=4)), ["api:execute", "api:execute"]),
+        (str(UUID(int=4)), ["api:unknown"]),
+    ],
+)
+async def test_rejects_invalid_api_key_agent_claims(key_claim: str, scopes: list[str]) -> None:
+    key = OKPKey.generate_key("Ed25519")
+    api_key_id = UUID(int=4)
+
+    def jwks(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={"keys": [public_jwk(key, "key-1")]},
+            request=request,
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(jwks)) as client:
+        verifier = TokenVerifier(
+            jwks_url="https://identity.example/.well-known/jwks.json",
+            issuer="https://identity.example",
+            audience="dinkster-session",
+            client=client,
+        )
+        assert (
+            await verifier.verify(
+                token(
+                    key,
+                    "key-1",
+                    claims(
+                        sub=f"k_{api_key_id}",
+                        kind="agent",
+                        key=key_claim,
+                        key_scopes=scopes,
+                    ),
+                )
+            )
+            is None
+        )
+
+
 def test_package_has_no_identity_service_imports() -> None:
     package_root = Path(dinkster_token_verifier.__file__).parent
     for path in package_root.glob("*.py"):
