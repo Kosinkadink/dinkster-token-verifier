@@ -7,8 +7,8 @@ accounts, access a database, or run a service.
 
 ## Install
 
-Install the wheel attached to the `v0.1.0` GitHub release. Consumers should
-pin both version 0.1.0 and the wheel's SHA-256 digest.
+Install the wheel attached to the `v0.1.1` GitHub release. Consumers should
+pin both version 0.1.1 and the wheel's SHA-256 digest.
 
 ## Access token contract
 
