@@ -7,7 +7,7 @@ accounts, access a database, or run a service.
 
 ## Install
 
-Consumers pin `dinkster-token-verifier==0.1.1` in package metadata and record
+Consumers pin `dinkster-token-verifier==0.1.2` in package metadata and record
 the resolved PyPI wheel hashes in their lockfile. Before its first PyPI
 publication, build a local wheel with `python -m build`.
 
