@@ -7,8 +7,25 @@ accounts, access a database, or run a service.
 
 ## Install
 
-Install the wheel attached to the `v0.1.1` GitHub release. Consumers should
-pin both version 0.1.1 and the wheel's SHA-256 digest.
+Consumers pin `dinkster-token-verifier==0.1.1` in package metadata and record
+the resolved PyPI wheel hashes in their lockfile. Before its first PyPI
+publication, build a local wheel with `python -m build`.
+
+## Releases
+
+Update `project.version` before changing a published distribution. From a
+validated, landed commit, an authorized maintainer pushes the matching
+`vX.Y.Z` tag. `.github/workflows/release.yml` builds the wheel and sdist,
+checks their metadata, and publishes those same artifacts to PyPI using
+trusted publishing. Branches and pull requests build without publishing.
+Consumers update their exact requirement and lock together after publication.
+
+The repository owner must register the PyPI project `dinkster-token-verifier`
+with a trusted publisher for owner `Kosinkadink`, repository
+`dinkster-token-verifier`, workflow `release.yml`, environment `pypi`.
+Before publishing, protect that GitHub environment with required owner approval
+and restrict deployment to version tags. Publication requires the owner's
+authorization; no stored PyPI API token is used.
 
 ## Access token contract
 
