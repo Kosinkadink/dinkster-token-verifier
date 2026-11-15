@@ -30,12 +30,13 @@ dev = [
 where = ["src"]
 
 [tool.setuptools.package-data]
-dinkster_token_verifier = ["py.typed"]
+dinkster_token_verifier = ["py.typed", "_release.json"]
 
 [tool.pytest.ini_options]
 addopts = "-ra"
 asyncio_mode = "auto"
 testpaths = ["tests"]
+pythonpath = ["."]
 
 [tool.ruff]
 line-length = 100

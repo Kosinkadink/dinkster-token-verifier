@@ -9,30 +9,46 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: python-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.identity.outputs.version }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Check release version
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Prepare release source and version
+        id: identity
+        env:
+          RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '' }}
         run: |
-          python - <<'PY'
-          import os
-          import tomllib
+          arguments=()
+          if [ -n "$RELEASE_TAG" ]; then arguments+=(--tag "$RELEASE_TAG"); fi
+          python scripts/prepare_release.py "${arguments[@]}" > release-provenance.json
+          python - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
           from pathlib import Path
-
-          version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
-          if os.environ["GITHUB_REF_NAME"] != f"v{version}":
-              raise SystemExit("Release tag must match the project version")
+          print('version=' + json.loads(Path('release-provenance.json').read_text())['version'])
           PY
       - run: python -m pip install build twine
-      - run: python -m build
+      - name: Build distributions
+        env:
+          STABLE_TAG: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          if [ "$STABLE_TAG" = true ]; then
+            python -m build
+          else
+            python -m build --wheel
+          fi
       - run: python -m twine check --strict dist/*
       - uses: actions/upload-artifact@v4
         with:
@@ -41,7 +57,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: github.repository == 'Kosinkadink/dinkster-token-verifier' && startsWith(github.ref, 'refs/tags/v')
+    if: github.repository == 'Kosinkadink/dinkster-token-verifier' && github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     needs: build
     runs-on: ubuntu-latest
     environment:
@@ -49,9 +65,41 @@ jobs:
       url: https://pypi.org/p/dinkster-token-verifier
     permissions:
       id-token: write
+      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: python-distributions
           path: dist
+      - name: Record development tag source identity
+        if: github.ref == 'refs/heads/main'
+        uses: actions/github-script@v7
+        env:
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+        with:
+          script: |
+            const version = process.env.RELEASE_VERSION;
+            const tag = `main-${version}`;
+            let object;
+            try {
+              object = (await github.rest.git.getRef({ ...context.repo, ref: `tags/${tag}` })).data.object;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              const annotation = await github.rest.git.createTag({
+                ...context.repo, tag, type: 'commit', object: context.sha,
+                message: JSON.stringify({ version, sourceCommit: context.sha }),
+              });
+              try {
+                await github.rest.git.createRef({ ...context.repo, ref: `refs/tags/${tag}`, sha: annotation.data.sha });
+              } catch (error) {
+                if (error.status !== 422) throw error;
+              }
+              object = (await github.rest.git.getRef({ ...context.repo, ref: `tags/${tag}` })).data.object;
+            }
+            while (object.type === 'tag') {
+              object = (await github.rest.git.getTag({ ...context.repo, tag_sha: object.sha })).data.object;
+            }
+            if (object.type !== 'commit' || object.sha !== context.sha) {
+              throw new Error('Release tag targets a different source commit');
+            }
       - uses: pypa/gh-action-pypi-publish@release/v1
