@@ -13,19 +13,23 @@ publication, build a local wheel with `python -m build`.
 
 ## Releases
 
-Update `project.version` before changing a published distribution. From a
-validated, landed commit, an authorized maintainer pushes the matching
-`vX.Y.Z` tag. `.github/workflows/release.yml` builds the wheel and sdist,
-checks their metadata, and publishes those same artifacts to PyPI using
-trusted publishing. Branches and pull requests build without publishing.
+Stable releases use the matching `vX.Y.Z` tag and build a wheel and sdist.
+Main pushes publish a wheel-only development release using the next patch
+and the total reachable commit count, such as `0.1.3.dev42`. Other branches
+and pull requests build development wheels without publishing. Both paths
+use `.github/workflows/release.yml` and PyPI trusted publishing.
+
+Release wheels record the exact source commit in package metadata and
+`dinkster_token_verifier/_release.json`. Main publication records the same
+version and commit in an immutable annotated `main-VERSION` tag. Stable tags
+are annotated by the authorized publisher at the validated landed commit.
 Consumers update their exact requirement and lock together after publication.
 
 The repository owner must register the PyPI project `dinkster-token-verifier`
 with a trusted publisher for owner `Kosinkadink`, repository
 `dinkster-token-verifier`, workflow `release.yml`, environment `pypi`.
-Before publishing, protect that GitHub environment with required owner approval
-and restrict deployment to version tags. Publication requires the owner's
-authorization; no stored PyPI API token is used.
+The GitHub environment must permit Main and version tags under the owner's
+publication policy. No stored PyPI API token is used.
 
 ## Access token contract
 
