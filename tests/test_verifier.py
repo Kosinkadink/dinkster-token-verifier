@@ -115,6 +115,43 @@ async def test_rejects_invalid_signed_claims(changes: dict[str, object]) -> None
         assert await verifier.verify(token(key, "key-1", claims(**changes))) is None
 
 
+@pytest.mark.asyncio
+async def test_mint_only_tokens_are_valid_only_without_service_rights() -> None:
+    key = OKPKey.generate_key("Ed25519")
+    project = f"project:{UUID(int=9)}"
+    payload = claims(
+        sub=f"k_{UUID(int=8)}",
+        key=str(UUID(int=8)),
+        key_scopes=["api:mint"],
+        org=None,
+        grants={project: []},
+    )
+
+    def jwks(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"keys": [public_jwk(key, "key-1")]})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(jwks)) as client:
+        verifier = TokenVerifier(
+            jwks_url="https://identity.example/.well-known/jwks.json",
+            issuer="https://identity.example",
+            audience="dinkster-session",
+            client=client,
+        )
+        principal = await verifier.verify(token(key, "key-1", payload))
+        assert principal is not None
+        assert principal.api_key_scopes == {"api:mint"}
+        assert principal.grants == {project: frozenset()}
+        for changes in (
+            {"grants": {project: ["jobs:submit"]}},
+            {"key_scopes": ["api:mint", "api:read"]},
+            {"grants": {}},
+            {"grants": {project: [], f"project:{UUID(int=10)}": []}},
+            {"org": str(UUID(int=3)), "grants": {f"org:{UUID(int=3)}": []}},
+            {"iss": "https://qa-identity.example", "aud": "gateway-qa"},
+        ):
+            assert await verifier.verify(token(key, "key-1", {**payload, **changes})) is None
+
+
 def test_package_has_no_identity_service_imports() -> None:
     package_root = Path(dinkster_token_verifier.__file__).parent
     for path in package_root.glob("*.py"):
