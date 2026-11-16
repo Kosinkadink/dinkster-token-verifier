@@ -17,7 +17,9 @@ from joserfc.jwk import OKPKey
 from joserfc.jwt import JWTClaimsRegistry
 
 ALLOWED_ALGORITHMS = frozenset({"Ed25519"})
-API_KEY_SCOPES = frozenset({"api:execute", "api:assets", "api:sessions", "api:read", "admin:org"})
+API_KEY_SCOPES = frozenset(
+    {"api:mint", "api:execute", "api:assets", "api:sessions", "api:read", "admin:org"}
+)
 MAX_TOKEN_LENGTH = 32_768
 MAX_TOKEN_LIFETIME_SECONDS = 10 * 60
 CLOCK_SKEW_LEEWAY_SECONDS = 30
@@ -264,6 +266,18 @@ class TokenVerifier:
             if not all(isinstance(capability, str) and capability for capability in capabilities):
                 raise ValueError("Grants claim is invalid")
             grants[scope] = frozenset(capabilities)
+        if (
+            api_key_scopes is not None
+            and "api:mint" in api_key_scopes
+            and (
+                api_key_scopes != {"api:mint"}
+                or organization_id is not None
+                or len(grants) != 1
+                or not next(iter(grants)).startswith("project:")
+                or any(grants.values())
+            )
+        ):
+            raise ValueError("Mint-only tokens cannot carry capabilities")
         return VerifiedPrincipal(
             principal_id=principal_id,
             grants=MappingProxyType(grants),
